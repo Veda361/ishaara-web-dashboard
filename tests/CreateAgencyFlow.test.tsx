@@ -190,7 +190,9 @@ describe("Create Agency Profile Flow & AuthGuard Activation", () => {
         businessName: "PMTA Services LLP",
         contactEmail: "devranjeetq@gmail.com",
         contactPhone: "+919876543210",
-        city: "Pune",
+        address: {
+          city: "Pune",
+        },
       });
       expect(mockRefreshAgencies).toHaveBeenCalledTimes(1);
       expect(mockToast).toHaveBeenCalledWith("Agency profile created successfully", "success");

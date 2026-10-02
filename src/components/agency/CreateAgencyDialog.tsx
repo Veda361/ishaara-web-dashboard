@@ -88,13 +88,25 @@ export function CreateAgencyDialog({ isOpen, onClose, onSuccess }: CreateAgencyD
       return;
     }
 
-    registerMutation.mutate({
+    const formData = {
       name: trimmedName,
+      businessName: trimmedBusiness,
       contactEmail: trimmedEmail,
       contactPhone: trimmedPhone,
-      city: trimmedCity || undefined,
-      businessName: trimmedBusiness || undefined,
-    });
+      city: trimmedCity,
+    };
+
+    const payload = {
+      name: formData.name,
+      businessName: formData.businessName || null,
+      contactEmail: formData.contactEmail,
+      contactPhone: formData.contactPhone,
+      address: {
+        city: formData.city || null,
+      },
+    };
+
+    registerMutation.mutate(payload);
   };
 
   return (

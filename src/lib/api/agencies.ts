@@ -1,12 +1,23 @@
 import { apiClient } from "./client";
 import { Agency, AgencyManageData, ApiResponse, PaginatedResult } from "@/types";
 
+export interface AgencyAddressPayload {
+  street?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+  country?: string | null;
+}
+
 export interface RegisterAgencyPayload {
   name: string;
   contactEmail: string;
   contactPhone: string;
+  businessName?: string | null;
+  registrationNumber?: string | null;
+  taxId?: string | null;
+  address?: AgencyAddressPayload | null;
   city?: string;
-  businessName?: string;
 }
 
 export interface UpdateAgencyPayload {
