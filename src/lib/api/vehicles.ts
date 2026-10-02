@@ -26,12 +26,11 @@ export interface UpdateVehiclePayload {
 export const vehiclesApi = {
   async listVehicles(
     agencyId: string,
-    params?: { page?: number; limit?: number; status?: string }
+    params?: { page?: number; limit?: number }
   ): Promise<PaginatedResult<Vehicle>> {
     const query = new URLSearchParams();
     if (params?.page) query.set("page", String(params.page));
     if (params?.limit) query.set("limit", String(params.limit));
-    if (params?.status && params.status !== "ALL") query.set("status", params.status);
 
     const qs = query.toString();
     const endpoint = `/api/v1/agencies/${encodeURIComponent(agencyId)}/vehicles${

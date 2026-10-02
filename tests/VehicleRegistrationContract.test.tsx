@@ -364,4 +364,82 @@ describe("Vehicle Registration Strict Contract & Flow Suite", () => {
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
   });
+
+  it("fetches vehicles without status query parameter and filters by isActive client-side across ALL, ACTIVE, and INACTIVE tabs", async () => {
+    const mockVehicles = [
+      {
+        id: "veh_1",
+        agencyId: mockAgency.id,
+        registrationNumber: "UP93 AA 1111",
+        make: "Ashok Leyland",
+        model: "Ashoka 1",
+        vehicleType: "BUS" as BackendVehicleType,
+        capacity: 68,
+        isActive: true,
+        ownershipType: "AGENCY" as const,
+        createdAt: "2026-10-02T10:00:00.000Z",
+      },
+      {
+        id: "veh_2",
+        agencyId: mockAgency.id,
+        registrationNumber: "UP93 AA 2222",
+        make: "Tata",
+        model: "Starbus",
+        vehicleType: "BUS" as BackendVehicleType,
+        capacity: 32,
+        isActive: false,
+        ownershipType: "AGENCY" as const,
+        createdAt: "2026-10-02T11:00:00.000Z",
+      },
+    ];
+
+    const listSpy = vi.spyOn(vehiclesApi, "listVehicles").mockResolvedValue({
+      items: mockVehicles,
+      pagination: { total: 2, page: 1, limit: 10, totalPages: 1 },
+    });
+
+    const Wrapper = createTestWrapper();
+    render(<VehiclesPage />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(listSpy).toHaveBeenCalledTimes(1);
+    });
+
+    // Verify listVehicles was called with page and limit only, NO status parameter
+    const [calledAgencyId, calledParams] = listSpy.mock.calls[0];
+    expect(calledAgencyId).toBe(mockAgency.id);
+    expect(calledParams).toEqual({ page: 1, limit: 10 });
+    expect((calledParams as Record<string, unknown>).status).toBeUndefined();
+
+    // ALL tab (default): Both active and inactive vehicles should be visible
+    await waitFor(() => {
+      expect(screen.getAllByText("UP93 AA 1111").length).toBeGreaterThan(0);
+    });
+    expect(screen.getAllByText("UP93 AA 2222").length).toBeGreaterThan(0);
+
+    // Click ACTIVE tab
+    fireEvent.click(screen.getByRole("button", { name: "ACTIVE" }));
+
+    // No additional API call should be made!
+    expect(listSpy).toHaveBeenCalledTimes(1);
+
+    // Only active vehicle should be visible
+    expect(screen.getAllByText("UP93 AA 1111").length).toBeGreaterThan(0);
+    expect(screen.queryAllByText("UP93 AA 2222").length).toBe(0);
+
+    // Click INACTIVE tab
+    fireEvent.click(screen.getByRole("button", { name: "INACTIVE" }));
+
+    // Still no additional API call!
+    expect(listSpy).toHaveBeenCalledTimes(1);
+
+    // Only inactive vehicle should be visible
+    expect(screen.queryAllByText("UP93 AA 1111").length).toBe(0);
+    expect(screen.getAllByText("UP93 AA 2222").length).toBeGreaterThan(0);
+
+    // Click back to ALL tab
+    fireEvent.click(screen.getByRole("button", { name: "ALL" }));
+    expect(screen.getAllByText("UP93 AA 1111").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("UP93 AA 2222").length).toBeGreaterThan(0);
+  });
 });

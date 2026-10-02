@@ -67,13 +67,12 @@ export default function VehiclesPage() {
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["agency-vehicles", agencyId, statusFilter, page],
+    queryKey: ["agency-vehicles", agencyId, page],
     queryFn: () =>
       agencyId
         ? vehiclesApi.listVehicles(agencyId, {
             page,
             limit: 10,
-            status: statusFilter === "ALL" ? undefined : statusFilter,
           })
         : null,
     enabled: !!agencyId,
@@ -113,6 +112,11 @@ export default function VehiclesPage() {
   });
 
   const items = vehiclesResult?.items || [];
+  const filteredItems = items.filter((veh) => {
+    if (statusFilter === "ACTIVE") return veh.isActive === true;
+    if (statusFilter === "INACTIVE") return veh.isActive === false;
+    return true;
+  });
   const pagination = vehiclesResult?.pagination || { total: 0, page: 1, limit: 10, totalPages: 1 };
 
   const validateForm = (): boolean => {
@@ -185,7 +189,6 @@ export default function VehiclesPage() {
                 key={st}
                 onClick={() => {
                   setStatusFilter(st);
-                  setPage(1);
                 }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                   statusFilter === st
@@ -212,12 +215,18 @@ export default function VehiclesPage() {
 
         {isLoading ? (
           <TableSkeleton rows={5} cols={6} />
-        ) : items.length === 0 ? (
+        ) : filteredItems.length === 0 ? (
           <div className="p-12 text-center bg-white rounded-2xl border border-slate-200/80 space-y-2">
             <Bus className="mx-auto h-8 w-8 text-slate-300" />
-            <h4 className="text-sm font-semibold text-slate-700">No vehicles registered</h4>
+            <h4 className="text-sm font-semibold text-slate-700">
+              {items.length === 0
+                ? "No vehicles registered"
+                : `No ${statusFilter.toLowerCase()} vehicles found`}
+            </h4>
             <p className="text-xs text-slate-400">
-              No fleet vehicles found for this agency. Click "Add Vehicle" to register buses or other fleet vehicles.
+              {items.length === 0
+                ? "No fleet vehicles found for this agency. Click \"Add Vehicle\" to register buses or other fleet vehicles."
+                : `There are currently no vehicles with ${statusFilter.toLowerCase()} status.`}
             </p>
           </div>
         ) : (
@@ -236,7 +245,7 @@ export default function VehiclesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {items.map((veh) => (
+                  {filteredItems.map((veh) => (
                     <TableRow key={veh.id}>
                       <TableCell className="font-mono font-semibold text-slate-900">
                         {veh.registrationNumber}
@@ -303,7 +312,7 @@ export default function VehiclesPage() {
 
             {/* Mobile View */}
             <div className="md:hidden space-y-3">
-              {items.map((veh) => (
+              {filteredItems.map((veh) => (
                 <div key={veh.id} className="p-4 bg-white rounded-2xl border border-slate-200 space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
