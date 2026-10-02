@@ -15,8 +15,19 @@ import { TableSkeleton } from "@/components/ui/skeleton";
 import { Alert } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/toast";
 import { formatApiErrorMessage } from "@/lib/errors";
-import { Bus, Plus, Eye, ToggleLeft, ToggleRight, CheckCircle2, ChevronLeft, ChevronRight } from "lucide-react";
-import { VehicleType } from "@/types";
+import { Bus, Plus, Eye, ChevronLeft, ChevronRight } from "lucide-react";
+import { BackendVehicleType } from "@/types";
+import { cn } from "@/lib/utils";
+
+const VEHICLE_TYPE_OPTIONS: { label: string; value: BackendVehicleType }[] = [
+  { label: "Auto", value: "AUTO" },
+  { label: "E-Rickshaw", value: "E_RICKSHAW" },
+  { label: "Cab", value: "CAB" },
+  { label: "Bus (Heavy Transit)", value: "BUS" },
+  { label: "Car", value: "CAR" },
+  { label: "Bike", value: "BIKE" },
+  { label: "Other", value: "OTHER" },
+];
 
 export default function VehiclesPage() {
   const { activeAgency } = useAuth();
@@ -30,9 +41,26 @@ export default function VehiclesPage() {
 
   // Form State
   const [registrationNumber, setRegistrationNumber] = useState("");
+  const [make, setMake] = useState("");
   const [model, setModel] = useState("");
-  const [vehicleType, setVehicleType] = useState<VehicleType>("BUS");
-  const [capacity, setCapacity] = useState(32);
+  const [vehicleType, setVehicleType] = useState<BackendVehicleType>("BUS");
+  const [capacity, setCapacity] = useState("");
+  const [errors, setErrors] = useState<{
+    registrationNumber?: string;
+    make?: string;
+    model?: string;
+    vehicleType?: string;
+    capacity?: string;
+  }>({});
+
+  const resetForm = () => {
+    setRegistrationNumber("");
+    setMake("");
+    setModel("");
+    setVehicleType("BUS");
+    setCapacity("");
+    setErrors({});
+  };
 
   const {
     data: vehiclesResult,
@@ -57,9 +85,7 @@ export default function VehiclesPage() {
     onSuccess: () => {
       toast("Vehicle registered to agency fleet", "success");
       setIsAddOpen(false);
-      setRegistrationNumber("");
-      setModel("");
-      setCapacity(32);
+      resetForm();
       queryClient.invalidateQueries({ queryKey: ["agency-vehicles", agencyId] });
       queryClient.invalidateQueries({ queryKey: ["agency-manage", agencyId] });
     },
@@ -89,15 +115,58 @@ export default function VehiclesPage() {
   const items = vehiclesResult?.items || [];
   const pagination = vehiclesResult?.pagination || { total: 0, page: 1, limit: 10, totalPages: 1 };
 
+  const validateForm = (): boolean => {
+    const errs: {
+      registrationNumber?: string;
+      make?: string;
+      model?: string;
+      vehicleType?: string;
+      capacity?: string;
+    } = {};
+
+    if (!registrationNumber.trim()) {
+      errs.registrationNumber = "Registration number is required";
+    }
+
+    if (!make.trim()) {
+      errs.make = "Vehicle make is required";
+    }
+
+    if (!model.trim()) {
+      errs.model = "Vehicle model is required";
+    }
+
+    if (!vehicleType) {
+      errs.vehicleType = "Vehicle type is required";
+    }
+
+    if (capacity.trim() !== "") {
+      const parsed = Number(capacity.trim());
+      if (isNaN(parsed) || !Number.isInteger(parsed) || parsed < 1 || parsed > 200) {
+        errs.capacity = "Seating capacity must be between 1 and 200";
+      }
+    }
+
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
   const handleRegisterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!registrationNumber.trim() || !model.trim()) return;
-    registerMutation.mutate({
+    if (!validateForm()) return;
+
+    const payload: RegisterVehiclePayload = {
       registrationNumber: registrationNumber.trim().toUpperCase(),
+      vehicleType,
+      make: make.trim(),
       model: model.trim(),
-      type: vehicleType,
-      capacity: Number(capacity),
-    });
+    };
+
+    if (capacity.trim() !== "") {
+      payload.capacity = parseInt(capacity.trim(), 10);
+    }
+
+    registerMutation.mutate(payload);
   };
 
   return (
@@ -148,7 +217,7 @@ export default function VehiclesPage() {
             <Bus className="mx-auto h-8 w-8 text-slate-300" />
             <h4 className="text-sm font-semibold text-slate-700">No vehicles registered</h4>
             <p className="text-xs text-slate-400">
-              No fleet vehicles found for this agency. Click "Add Vehicle" to register buses or vans.
+              No fleet vehicles found for this agency. Click "Add Vehicle" to register buses or other fleet vehicles.
             </p>
           </div>
         ) : (
@@ -158,7 +227,7 @@ export default function VehiclesPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Registration No.</TableHead>
-                    <TableHead>Model</TableHead>
+                    <TableHead>Make & Model</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Capacity</TableHead>
                     <TableHead>Operating Status</TableHead>
@@ -172,13 +241,17 @@ export default function VehiclesPage() {
                       <TableCell className="font-mono font-semibold text-slate-900">
                         {veh.registrationNumber}
                       </TableCell>
-                      <TableCell className="text-xs text-slate-700">{veh.model}</TableCell>
+                      <TableCell className="text-xs text-slate-700">
+                        {veh.make ? `${veh.make} ${veh.model}` : veh.model}
+                      </TableCell>
                       <TableCell>
                         <Badge variant="neutral" size="sm">
-                          {veh.type}
+                          {veh.vehicleType || veh.type}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-xs text-slate-600">{veh.capacity} seats</TableCell>
+                      <TableCell className="text-xs text-slate-600">
+                        {veh.capacity ? `${veh.capacity} seats` : "—"}
+                      </TableCell>
                       <TableCell>
                         <Badge variant={veh.isActive ? "success" : "neutral"} size="sm">
                           {veh.isActive ? "ACTIVE" : "INACTIVE"}
@@ -235,14 +308,16 @@ export default function VehiclesPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="font-mono font-bold text-sm text-slate-900">{veh.registrationNumber}</h4>
-                      <p className="text-xs text-slate-500">{veh.model} • {veh.type}</p>
+                      <p className="text-xs text-slate-500">
+                        {veh.make ? `${veh.make} ` : ""}{veh.model} • {veh.vehicleType || veh.type}
+                      </p>
                     </div>
                     <Badge variant={veh.isActive ? "success" : "neutral"} size="sm">
                       {veh.isActive ? "ACTIVE" : "INACTIVE"}
                     </Badge>
                   </div>
                   <div className="text-xs text-slate-600">
-                    Driver: {veh.currentAssignment?.driverName || "Unassigned"} • Capacity: {veh.capacity}
+                    Driver: {veh.currentAssignment?.driverName || "Unassigned"} • Capacity: {veh.capacity ? `${veh.capacity} seats` : "—"}
                   </div>
                   <div className="pt-2 flex justify-end">
                     <Link href={`/dashboard/vehicles/${veh.id}`} className="w-full">
@@ -288,53 +363,116 @@ export default function VehiclesPage() {
       {/* Add Vehicle Modal */}
       <Dialog
         isOpen={isAddOpen}
-        onClose={() => setIsAddOpen(false)}
+        onClose={() => {
+          setIsAddOpen(false);
+          resetForm();
+        }}
         title="Register Fleet Vehicle"
         description="Add a new transit vehicle to your agency fleet."
       >
-        <form onSubmit={handleRegisterSubmit} className="space-y-4">
+        <form onSubmit={handleRegisterSubmit} className="space-y-4" noValidate>
           <Input
+            id="registrationNumber"
             label="Registration Number *"
-            placeholder="MH12AB1234"
+            placeholder="UP93 AA 4320"
             value={registrationNumber}
-            onChange={(e) => setRegistrationNumber(e.target.value)}
+            onChange={(e) => {
+              setRegistrationNumber(e.target.value);
+              if (errors.registrationNumber) {
+                setErrors((prev) => ({ ...prev, registrationNumber: undefined }));
+              }
+            }}
+            error={errors.registrationNumber}
             required
           />
+
           <Input
+            id="make"
+            label="Vehicle Make *"
+            placeholder="Ashok Leyland"
+            helperText="Vehicle manufacturer / brand"
+            value={make}
+            onChange={(e) => {
+              setMake(e.target.value);
+              if (errors.make) {
+                setErrors((prev) => ({ ...prev, make: undefined }));
+              }
+            }}
+            error={errors.make}
+            required
+          />
+
+          <Input
+            id="model"
             label="Vehicle Model *"
-            placeholder="Tata Starbus Ultra"
+            placeholder="Viking / Starbus / Ashoka"
+            helperText="Vehicle model name"
             value={model}
-            onChange={(e) => setModel(e.target.value)}
+            onChange={(e) => {
+              setModel(e.target.value);
+              if (errors.model) {
+                setErrors((prev) => ({ ...prev, model: undefined }));
+              }
+            }}
+            error={errors.model}
             required
           />
+
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-700">Vehicle Type</label>
+            <label htmlFor="vehicleType" className="block text-xs font-semibold text-slate-700 tracking-wide">
+              Vehicle Type *
+            </label>
             <select
-              className="w-full px-3.5 py-2.5 bg-white text-slate-900 text-sm rounded-xl border border-slate-200"
+              id="vehicleType"
+              className={cn(
+                "w-full px-3.5 py-2.5 bg-white text-slate-900 text-sm rounded-xl border border-slate-200 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-xs",
+                errors.vehicleType && "border-rose-400 focus:ring-rose-500 focus:border-rose-500"
+              )}
               value={vehicleType}
-              onChange={(e) => setVehicleType(e.target.value as VehicleType)}
+              onChange={(e) => {
+                setVehicleType(e.target.value as BackendVehicleType);
+                if (errors.vehicleType) {
+                  setErrors((prev) => ({ ...prev, vehicleType: undefined }));
+                }
+              }}
             >
-              <option value="BUS">Bus (Heavy Transit)</option>
-              <option value="MINIBUS">Minibus (Shuttle)</option>
-              <option value="VAN">Van / Traveler</option>
-              <option value="AUTO">Auto</option>
+              {VEHICLE_TYPE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
             </select>
+            {errors.vehicleType && (
+              <p className="text-xs text-rose-600 font-medium">{errors.vehicleType}</p>
+            )}
           </div>
+
           <Input
-            label="Seating Capacity *"
-            type="number"
-            min={1}
-            max={100}
+            id="capacity"
+            label="Seating Capacity"
+            type="text"
+            inputMode="numeric"
+            placeholder="e.g. 68"
+            helperText="Maximum passenger seating capacity (1 - 200, optional)"
             value={capacity}
-            onChange={(e) => setCapacity(Number(e.target.value))}
-            required
+            onChange={(e) => {
+              setCapacity(e.target.value);
+              if (errors.capacity) {
+                setErrors((prev) => ({ ...prev, capacity: undefined }));
+              }
+            }}
+            error={errors.capacity}
           />
+
           <div className="flex justify-end gap-2 pt-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => setIsAddOpen(false)}
+              onClick={() => {
+                setIsAddOpen(false);
+                resetForm();
+              }}
             >
               Cancel
             </Button>

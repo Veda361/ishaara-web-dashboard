@@ -79,8 +79,17 @@ export interface AgencyMembership {
   driver?: DriverInfo;
 }
 
-export type VehicleType = "BUS" | "MINIBUS" | "VAN" | "AUTO";
-export type VehicleOwnershipType = "AGENCY" | "DRIVER";
+export type BackendVehicleType =
+  | "AUTO"
+  | "E_RICKSHAW"
+  | "CAB"
+  | "BUS"
+  | "CAR"
+  | "BIKE"
+  | "OTHER";
+
+export type VehicleType = BackendVehicleType | "MINIBUS" | "VAN";
+export type VehicleOwnershipType = "AGENCY" | "DRIVER" | "INDIVIDUAL" | "OPERATOR";
 export type VehicleVerificationStatus = "PENDING" | "VERIFIED" | "REJECTED";
 
 export interface VehicleAssignmentInfo {
@@ -92,12 +101,14 @@ export interface VehicleAssignmentInfo {
 
 export interface Vehicle {
   id: string;
-  agencyId: string;
+  agencyId?: string | null;
   registrationNumber: string;
+  make?: string;
   model: string;
-  type: VehicleType;
-  capacity: number;
-  ownershipType: VehicleOwnershipType;
+  type?: VehicleType;
+  vehicleType?: VehicleType;
+  capacity?: number | null;
+  ownershipType?: VehicleOwnershipType;
   isActive: boolean;
   verificationStatus?: VehicleVerificationStatus;
   currentAssignment?: VehicleAssignmentInfo | null;

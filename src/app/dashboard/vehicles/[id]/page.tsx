@@ -95,11 +95,13 @@ export default function VehicleDetailPage() {
               <CardHeader className="flex flex-row items-center justify-between pb-3">
                 <div className="flex items-center gap-3">
                   <div className="h-12 w-12 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-mono font-bold text-sm">
-                    {vehicle.type.slice(0, 3)}
+                    {(vehicle.vehicleType || vehicle.type || "VEH").slice(0, 3)}
                   </div>
                   <div>
                     <CardTitle className="font-mono text-lg">{vehicle.registrationNumber}</CardTitle>
-                    <p className="text-xs text-slate-500">{vehicle.model}</p>
+                    <p className="text-xs text-slate-500">
+                      {vehicle.make ? `${vehicle.make} ` : ""}{vehicle.model}
+                    </p>
                   </div>
                 </div>
 
@@ -108,26 +110,30 @@ export default function VehicleDetailPage() {
                 </Badge>
               </CardHeader>
 
-              <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-3 text-xs">
+              <CardContent className="grid grid-cols-1 sm:grid-cols-4 gap-6 pt-3 text-xs">
+                <div>
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
+                    Vehicle Make
+                  </span>
+                  <span className="text-sm font-medium text-slate-900">{vehicle.make || "—"}</span>
+                </div>
+
                 <div>
                   <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
                     Vehicle Type
                   </span>
-                  <span className="text-sm font-medium text-slate-900">{vehicle.type}</span>
+                  <span className="text-sm font-medium text-slate-900">
+                    {vehicle.vehicleType || vehicle.type || "—"}
+                  </span>
                 </div>
 
                 <div>
                   <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
                     Seating Capacity
                   </span>
-                  <span className="text-sm font-medium text-slate-900">{vehicle.capacity} seats</span>
-                </div>
-
-                <div>
-                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
-                    Ownership Type
+                  <span className="text-sm font-medium text-slate-900">
+                    {vehicle.capacity ? `${vehicle.capacity} seats` : "—"}
                   </span>
-                  <span className="text-sm font-medium text-slate-900">{vehicle.ownershipType}</span>
                 </div>
 
                 <div>

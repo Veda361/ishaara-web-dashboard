@@ -1,7 +1,7 @@
 import { apiClient } from "./client";
 import {
   Vehicle,
-  VehicleType,
+  BackendVehicleType,
   DriverVehicleAssignment,
   ApiResponse,
   PaginatedResult,
@@ -9,14 +9,17 @@ import {
 
 export interface RegisterVehiclePayload {
   registrationNumber: string;
+  vehicleType: BackendVehicleType;
+  make: string;
   model: string;
-  type: VehicleType;
-  capacity: number;
+  capacity?: number;
 }
 
 export interface UpdateVehiclePayload {
+  registrationNumber?: string;
+  vehicleType?: BackendVehicleType;
+  make?: string;
   model?: string;
-  type?: VehicleType;
   capacity?: number;
 }
 
