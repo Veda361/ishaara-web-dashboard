@@ -1,16 +1,18 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Building2, ShieldAlert, Loader2 } from "lucide-react";
+import { Building2, Loader2, PlusCircle } from "lucide-react";
 import Link from "next/link";
+import { CreateAgencyDialog } from "@/components/agency/CreateAgencyDialog";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { user, isLoading, isAuthenticated, isAgencyOwner, ownedAgencies } = useAuth();
+  const { user, isLoading, isAuthenticated, ownedAgencies } = useAuth();
   const router = useRouter();
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   useEffect(() => {
     if (!isLoading) {
@@ -54,15 +56,25 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
               To operate the ISHAARA Agency Dashboard, register your fleet agency or contact platform support.
             </p>
             <div className="flex flex-col gap-2">
-              <Link href="/dashboard/settings" className="w-full">
-                <Button className="w-full">Create Agency Profile</Button>
-              </Link>
+              <Button
+                id="create-agency-profile-btn"
+                className="w-full gap-2"
+                onClick={() => setIsCreateOpen(true)}
+              >
+                <PlusCircle className="h-4 w-4" />
+                Create Agency Profile
+              </Button>
               <Link href="/login" className="w-full">
                 <Button variant="outline" className="w-full">Switch Account</Button>
               </Link>
             </div>
           </CardContent>
         </Card>
+
+        <CreateAgencyDialog
+          isOpen={isCreateOpen}
+          onClose={() => setIsCreateOpen(false)}
+        />
       </div>
     );
   }

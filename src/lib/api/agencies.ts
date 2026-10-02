@@ -38,8 +38,11 @@ export const agenciesApi = {
   },
 
   async registerAgency(payload: RegisterAgencyPayload): Promise<Agency> {
-    const res = await apiClient.post<ApiResponse<Agency>>("/api/v1/agencies", payload);
-    return res.data;
+    const res = await apiClient.post<ApiResponse<Agency> | Agency>("/api/v1/agencies", payload);
+    if (res && typeof res === "object" && "data" in res && (res as ApiResponse<Agency>).data) {
+      return (res as ApiResponse<Agency>).data;
+    }
+    return res as Agency;
   },
 
   async updateAgency(agencyId: string, payload: UpdateAgencyPayload): Promise<Agency> {

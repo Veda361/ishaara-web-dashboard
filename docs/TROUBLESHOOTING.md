@@ -92,11 +92,13 @@ fetch('https://reposnse-ishaara.onrender.com/api/v1/users/me', {
 
 ### 2.3 AGENCY_OWNER Sees "No Registered Agency Found"
 
-**Cause:** Authenticated user has no agencies in the backend
+**Cause:** Authenticated user has no agencies registered under their ownership in the backend (`GET /api/v1/agencies/me/owned` returns empty array).
 
 **Resolution:**
-- User must create an agency via the backend API or mobile app first
-- The dashboard requires `ownedAgencies.length > 0` for dashboard access
+- Click the **"Create Agency Profile"** button directly on the screen to open the registration dialog.
+- Fill in the required agency details (Agency Name, Contact Email, Contact Phone, and optional City and Business Name) and click **"Create Agency"**.
+- Upon submission, the agency is registered via `POST /api/v1/agencies`, the dashboard context automatically refreshes, and full fleet dashboard access is granted.
+- Alternatively, agencies can also be registered via the mobile app or backend API.
 
 ### 2.4 User Redirected to /unauthorized
 
