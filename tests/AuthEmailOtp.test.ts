@@ -78,4 +78,21 @@ describe("Phase A24.1 — Auth Email OTP Delivery & Verification Suite", () => {
       expect(result.user.role).toBe("AGENCY_OWNER");
     });
   });
+
+  describe("formatApiErrorMessage Network & Diagnostic Handling", () => {
+    it("maps status 0 and NETWORK_ERROR to user-friendly connectivity message without leaking internals", async () => {
+      const { ApiError, formatApiErrorMessage } = await import("@/lib/errors");
+      const networkError = new ApiError(0, "NETWORK_ERROR", "Failed to fetch");
+      expect(formatApiErrorMessage(networkError)).toBe(
+        "Unable to reach the authentication service. Please check your connection and try again."
+      );
+    });
+
+    it("maps standard 400 Invalid OTP message cleanly", async () => {
+      const { ApiError, formatApiErrorMessage } = await import("@/lib/errors");
+      const badOtpError = new ApiError(400, "INVALID_OTP", "Invalid OTP");
+      expect(formatApiErrorMessage(badOtpError)).toBe("Invalid OTP");
+    });
+  });
 });
+

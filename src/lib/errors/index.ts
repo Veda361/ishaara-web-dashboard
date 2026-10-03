@@ -105,6 +105,9 @@ export function formatApiErrorMessage(error: unknown): string {
     if (error.status >= 500) {
       return "Something went wrong on the server. Please try again later.";
     }
+    if (error.status === 0 || error.code === "NETWORK_ERROR") {
+      return "Unable to reach the authentication service. Please check your connection and try again.";
+    }
     return sanitizeMessage(error.message) || "An unexpected error occurred.";
   }
 

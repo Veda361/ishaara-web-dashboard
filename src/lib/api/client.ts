@@ -55,7 +55,7 @@ export async function request<T>(
   path: string,
   options: RequestOptions = {}
 ): Promise<T> {
-  const { timeoutMs = 15000, skipAuth = false, headers, ...rest } = options;
+  const { timeoutMs = 15000, skipAuth = false, headers, credentials = "include", ...rest } = options;
 
   const isInternalApi = path.startsWith("/api/admin");
   let url: string;
@@ -89,6 +89,7 @@ export async function request<T>(
   try {
     const response = await fetch(url, {
       ...rest,
+      credentials,
       headers: requestHeaders,
       signal: controller.signal,
     });
