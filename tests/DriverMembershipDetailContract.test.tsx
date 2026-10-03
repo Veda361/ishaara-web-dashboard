@@ -133,6 +133,45 @@ describe("Driver Membership Detail Contract & ID Separation", () => {
     });
   });
 
+  it("DriversPage: When listMemberships fails (e.g. 503 Service Unavailable), displays error state and does NOT display 'No driver records found'", async () => {
+    vi.spyOn(membershipsApi, "listMemberships").mockRejectedValue(
+      new ApiError(503, "SERVICE_UNAVAILABLE", "Administrative service is currently unavailable.")
+    );
+
+    const Wrapper = createTestWrapper();
+    render(<DriversPage />, { wrapper: Wrapper });
+
+    await waitFor(
+      () => {
+        expect(screen.getByRole("alert")).toBeDefined();
+      },
+      { timeout: 4000 }
+    );
+
+    // Error alert must be shown with formatted message
+    expect(screen.getByText(/Administrative service is currently unavailable/i)).toBeDefined();
+    expect(screen.getByRole("button", { name: /Retry Request/i })).toBeDefined();
+
+    // Invariant: Must NOT display misleading "No driver records found" empty state
+    expect(screen.queryByText(/No driver records found/i)).toBeNull();
+  });
+
+  it("DriversPage: When listMemberships returns empty list [], displays genuine empty state without error alert", async () => {
+    vi.spyOn(membershipsApi, "listMemberships").mockResolvedValue({
+      items: [],
+      pagination: { total: 0, page: 1, limit: 10, totalPages: 1 },
+    });
+
+    const Wrapper = createTestWrapper();
+    render(<DriversPage />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText(/No driver records found/i)).toBeDefined();
+    });
+
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("TASK 4, 9, 14: Given driverId != membershipId, when route receives membershipId, it requests membershipId and NEVER driverId", async () => {
     mockParams = { id: membershipId };
 

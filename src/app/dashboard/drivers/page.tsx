@@ -13,7 +13,8 @@ import { Input } from "@/components/ui/input";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { Alert } from "@/components/ui/alert";
 import { formatDateTime } from "@/lib/utils";
-import { Users, ChevronLeft, ChevronRight, Eye, Search } from "lucide-react";
+import { formatApiErrorMessage } from "@/lib/errors";
+import { Users, ChevronLeft, ChevronRight, Eye, Search, RefreshCw } from "lucide-react";
 
 export default function DriversPage() {
   const { activeAgency } = useAuth();
@@ -28,6 +29,7 @@ export default function DriversPage() {
     isLoading,
     error,
     refetch,
+    isFetching,
   } = useQuery({
     queryKey: ["agency-memberships", agencyId, statusFilter, page],
     queryFn: () =>
@@ -39,6 +41,15 @@ export default function DriversPage() {
           })
         : null,
     enabled: !!agencyId,
+    retry: (failureCount, err) => {
+      // Bounded retry for transient infrastructure/network errors (up to 2 retries)
+      if (failureCount >= 2) return false;
+      const status = (err as { status?: number })?.status;
+      // Do not retry 4xx errors
+      if (status && status >= 400 && status < 500) return false;
+      return true;
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 4000),
   });
 
   const items = membershipData?.items || [];
@@ -92,16 +103,30 @@ export default function DriversPage() {
           </div>
         </div>
 
-        {error && (
-          <Alert variant="danger">
-            Failed to load drivers for this agency. Please check connection and retry.
-          </Alert>
-        )}
-
-        {/* Desktop Table View */}
-        {isLoading ? (
+        {/* State A: Explicit Error State (do NOT show empty state or table when request failed) */}
+        {error ? (
+          <div className="p-8 text-center bg-white rounded-2xl border border-rose-200 shadow-xs space-y-4">
+            <Alert variant="danger" className="text-left">
+              {formatApiErrorMessage(error)}
+            </Alert>
+            <div className="pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetch()}
+                disabled={isFetching}
+                className="gap-2"
+              >
+                <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+                <span>{isFetching ? "Retrying..." : "Retry Request"}</span>
+              </Button>
+            </div>
+          </div>
+        ) : isLoading ? (
+          /* State B: Loading Skeleton */
           <TableSkeleton rows={5} cols={7} />
         ) : filteredItems.length === 0 ? (
+          /* State C: Genuine Empty State (only when API succeeds and returned empty list) */
           <div className="p-12 text-center bg-white rounded-2xl border border-slate-200/80 space-y-2">
             <Users className="mx-auto h-8 w-8 text-slate-300" />
             <h4 className="text-sm font-semibold text-slate-700">No driver records found</h4>
@@ -112,6 +137,7 @@ export default function DriversPage() {
             </p>
           </div>
         ) : (
+          /* State D: Data Table View */
           <>
             {/* Desktop Table */}
             <div className="hidden md:block">
