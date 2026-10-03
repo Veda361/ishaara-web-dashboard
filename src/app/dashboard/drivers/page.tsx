@@ -185,7 +185,7 @@ export default function DriversPage() {
                           {formatDateTime(mem.createdAt)}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Link href={`/dashboard/drivers/${mem.driverId || mem.id}`}>
+                          <Link href={`/dashboard/drivers/${mem.id}`}>
                             <Button size="sm" variant="outline">
                               <Eye className="h-3.5 w-3.5 mr-1" />
                               Details
@@ -239,7 +239,7 @@ export default function DriversPage() {
                     </div>
 
                     <div className="pt-2 flex justify-end">
-                      <Link href={`/dashboard/drivers/${mem.driverId || mem.id}`} className="w-full">
+                      <Link href={`/dashboard/drivers/${mem.id}`} className="w-full">
                         <Button size="sm" variant="outline" className="w-full">
                           View Details & Review
                         </Button>

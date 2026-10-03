@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { membershipsApi } from "@/lib/api/memberships";
+import { AgencyMembership } from "@/types";
 import { TopNav } from "@/components/layout/TopNav";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,12 +20,8 @@ import {
   ArrowLeft,
   CheckCircle,
   XCircle,
-  ShieldCheck,
-  ShieldAlert,
-  Clock,
   User,
   Info,
-  AlertTriangle,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -35,7 +32,7 @@ export default function DriverDetailPage() {
   const { toast } = useToast();
   const { activeAgency } = useAuth();
 
-  const id = typeof params.id === "string" ? params.id : "";
+  const rawId = typeof params.id === "string" ? params.id : "";
   const agencyId = activeAgency?.id;
 
   const [isApproveOpen, setIsApproveOpen] = useState(false);
@@ -44,28 +41,123 @@ export default function DriverDetailPage() {
   const [rejectReason, setRejectReason] = useState("");
   const [conflictMessage, setConflictMessage] = useState<string | null>(null);
 
-  // Fetch membership details
+  // Step 1: Query agency memberships to resolve whether rawId is a direct membershipId or a driverId
   const {
-    data: membership,
-    isLoading,
-    error,
-    refetch,
+    data: membershipsList,
+    isLoading: isListLoading,
+    error: listError,
   } = useQuery({
-    queryKey: ["agency-membership", agencyId, id],
-    queryFn: () => (agencyId && id ? membershipsApi.getMembership(agencyId, id) : null),
-    enabled: !!agencyId && !!id,
+    queryKey: ["agency-memberships", agencyId, "resolve-list"],
+    queryFn: () => (agencyId ? membershipsApi.listMemberships(agencyId, { limit: 50 }) : null),
+    enabled: !!agencyId && !!rawId,
+    staleTime: 30000,
   });
 
+  const cachedItems = React.useMemo(() => {
+    if (!agencyId) return [];
+    const cachedQueries = queryClient.getQueriesData<{ items?: AgencyMembership[] }>({
+      queryKey: ["agency-memberships", agencyId],
+    });
+    const items: AgencyMembership[] = [];
+    for (const [, data] of cachedQueries) {
+      if (data?.items) {
+        items.push(...data.items);
+      }
+    }
+    return items;
+  }, [queryClient, agencyId]);
+
+  const allKnownMemberships = React.useMemo(() => {
+    const listItems = membershipsList?.items || [];
+    const map = new Map<string, AgencyMembership>();
+    for (const item of [...cachedItems, ...listItems]) {
+      if (item && item.id) {
+        map.set(item.id, item);
+      }
+    }
+    return Array.from(map.values());
+  }, [cachedItems, membershipsList]);
+
+  // Check direct membership match or match by driverId
+  const directMembershipMatch = React.useMemo(
+    () => allKnownMemberships.find((m) => m.id === rawId),
+    [allKnownMemberships, rawId]
+  );
+  const driverMembershipMatch = React.useMemo(
+    () =>
+      allKnownMemberships.find(
+        (m) => m.driverId === rawId || m.driver?.id === rawId
+      ),
+    [allKnownMemberships, rawId]
+  );
+
+  const resolvedFromList = directMembershipMatch || driverMembershipMatch;
+  const resolvedMembershipId = resolvedFromList?.id || null;
+
+  // Canonicalize URL to membership ID if route was opened with a driverId
+  React.useEffect(() => {
+    if (
+      driverMembershipMatch &&
+      rawId !== driverMembershipMatch.id &&
+      driverMembershipMatch.id
+    ) {
+      router.replace(`/dashboard/drivers/${driverMembershipMatch.id}`);
+    }
+  }, [driverMembershipMatch, rawId, router]);
+
+  // Step 2: Fetch single membership details using the authoritative membershipId ONLY
+  const {
+    data: membershipDetail,
+    isLoading: isMembershipLoading,
+    error: membershipError,
+    refetch,
+  } = useQuery({
+    queryKey: ["agency-membership", agencyId, resolvedMembershipId],
+    queryFn: () =>
+      agencyId && resolvedMembershipId
+        ? membershipsApi.getMembership(agencyId, resolvedMembershipId)
+        : null,
+    enabled: !!agencyId && !!resolvedMembershipId,
+    initialData: resolvedFromList || undefined,
+  });
+
+  const membership = membershipDetail || resolvedFromList || null;
+  const driver = membership?.driver;
+  const isPending = membership?.status === "PENDING";
+  const isLoading = (isListLoading && !membership) || (isMembershipLoading && !membership);
+  const error = listError || membershipError;
+
   const approveMutation = useMutation({
-    mutationFn: (notesPayload?: string) =>
-      membershipsApi.approveMembership(agencyId!, membership?.id || id, { notes: notesPayload }),
+    mutationFn: (notesPayload?: string) => {
+      const targetMembershipId = resolvedMembershipId || membership?.id;
+      if (!agencyId || !targetMembershipId) {
+        throw new Error("Missing agency ID or membership ID for approval.");
+      }
+      return membershipsApi.approveMembership(agencyId, targetMembershipId, {
+        notes: notesPayload,
+      });
+    },
     onSuccess: () => {
       toast("Driver membership approved successfully", "success");
       setIsApproveOpen(false);
       setNotes("");
-      queryClient.invalidateQueries({ queryKey: ["agency-membership", agencyId, id] });
-      queryClient.invalidateQueries({ queryKey: ["agency-memberships", agencyId] });
-      queryClient.invalidateQueries({ queryKey: ["agency-manage", agencyId] });
+      if (agencyId && resolvedMembershipId) {
+        queryClient.invalidateQueries({
+          queryKey: ["agency-membership", agencyId, resolvedMembershipId],
+        });
+      }
+      queryClient.invalidateQueries({
+        queryKey: ["agency-memberships", agencyId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["agency-manage", agencyId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["agency-pending-memberships", agencyId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["agency-approved-drivers-for-assign", agencyId],
+      });
     },
     onError: (err: any) => {
       if (err?.status === 409 || err?.code === "MEMBERSHIP_ALREADY_PROCESSED") {
@@ -79,15 +171,36 @@ export default function DriverDetailPage() {
   });
 
   const rejectMutation = useMutation({
-    mutationFn: (reasonPayload: string) =>
-      membershipsApi.rejectMembership(agencyId!, membership?.id || id, { reason: reasonPayload }),
+    mutationFn: (reasonPayload: string) => {
+      const targetMembershipId = resolvedMembershipId || membership?.id;
+      if (!agencyId || !targetMembershipId) {
+        throw new Error("Missing agency ID or membership ID for rejection.");
+      }
+      return membershipsApi.rejectMembership(agencyId, targetMembershipId, {
+        reason: reasonPayload,
+      });
+    },
     onSuccess: () => {
       toast("Driver membership rejected", "info");
       setIsRejectOpen(false);
       setRejectReason("");
-      queryClient.invalidateQueries({ queryKey: ["agency-membership", agencyId, id] });
-      queryClient.invalidateQueries({ queryKey: ["agency-memberships", agencyId] });
-      queryClient.invalidateQueries({ queryKey: ["agency-manage", agencyId] });
+      if (agencyId && resolvedMembershipId) {
+        queryClient.invalidateQueries({
+          queryKey: ["agency-membership", agencyId, resolvedMembershipId],
+        });
+      }
+      queryClient.invalidateQueries({
+        queryKey: ["agency-memberships", agencyId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["agency-manage", agencyId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["agency-pending-memberships", agencyId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["agency-approved-drivers-for-assign", agencyId],
+      });
     },
     onError: (err: any) => {
       if (err?.status === 409 || err?.code === "MEMBERSHIP_ALREADY_PROCESSED") {
@@ -100,14 +213,17 @@ export default function DriverDetailPage() {
     },
   });
 
-  const driver = membership?.driver;
-  const isPending = membership?.status === "PENDING";
-
   return (
     <div className="space-y-6">
       <TopNav
         title="Driver Application Review"
-        subtitle={`Membership review for driver ID: ${id}`}
+        subtitle={
+          membership?.driver?.name
+            ? `Reviewing fleet membership for ${membership.driver.name}`
+            : resolvedMembershipId
+            ? `Membership ID: ${resolvedMembershipId}`
+            : "Review fleet membership application"
+        }
       />
 
       <div className="px-6 space-y-6 max-w-5xl">
@@ -145,6 +261,9 @@ export default function DriverDetailPage() {
           <Card className="p-8 text-center">
             <User className="mx-auto h-8 w-8 text-slate-300 mb-2" />
             <p className="text-sm font-semibold text-slate-700">Driver membership record not found</p>
+            <p className="text-xs text-slate-400 mt-1">
+              No active or pending membership record was found for this identifier in your agency fleet.
+            </p>
           </Card>
         ) : (
           <>
@@ -256,6 +375,24 @@ export default function DriverDetailPage() {
                   </span>
                   <span className="text-sm text-slate-900">
                     {membership.respondedAt ? formatDateTime(membership.respondedAt) : "Pending Review"}
+                  </span>
+                </div>
+
+                <div>
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                    Membership ID
+                  </span>
+                  <span className="text-xs font-mono text-slate-900 break-all">
+                    {membership.id}
+                  </span>
+                </div>
+
+                <div>
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                    Driver ID
+                  </span>
+                  <span className="text-xs font-mono text-slate-900 break-all">
+                    {membership.driverId || driver?.id || "—"}
                   </span>
                 </div>
               </CardContent>

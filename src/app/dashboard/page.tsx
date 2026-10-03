@@ -261,7 +261,7 @@ export default function DashboardOverviewPage() {
                       </p>
                     </div>
 
-                    <Link href={`/dashboard/drivers/${mem.driverId || mem.id}`}>
+                    <Link href={`/dashboard/drivers/${mem.id}`}>
                       <Button size="sm" variant="outline">
                         Review Application
                       </Button>
