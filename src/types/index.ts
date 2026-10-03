@@ -136,7 +136,14 @@ export interface DriverVehicleAssignment {
   driver?: DriverInfo;
 }
 
-export type TripStatus = "CREATED" | "ACTIVE" | "COMPLETED" | "CANCELLED";
+export type TripStatus =
+  | "CREATED"
+  | "SCHEDULED"
+  | "ASSIGNED"
+  | "READY"
+  | "ACTIVE"
+  | "COMPLETED"
+  | "CANCELLED";
 
 export interface ResolvedLocation {
   latitude: number;

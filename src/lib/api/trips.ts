@@ -75,6 +75,8 @@ export const tripsApi = {
       ...(payload.scheduledDepartureAt ? { scheduledDepartureAt: payload.scheduledDepartureAt } : {}),
     };
 
+    console.debug("[AgencyTrip] final payload", JSON.stringify(sanitizedPayload, null, 2));
+
     const res = await apiClient.post<ApiResponse<Trip>>(endpoint, sanitizedPayload);
     return res.data;
   },

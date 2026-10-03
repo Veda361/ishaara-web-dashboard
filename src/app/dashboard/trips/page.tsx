@@ -190,6 +190,8 @@ export default function TripsPage() {
       ...(startTime ? { scheduledDepartureAt: new Date(startTime).toISOString() } : {}),
     };
 
+    console.debug("[AgencyTrip] final payload", JSON.stringify(payload, null, 2));
+
     dispatchMutation.mutate(payload);
   };
 

@@ -81,13 +81,17 @@ describe("Agency Fleet Dispatch & Location Contract Suite", () => {
         name: "devranjeetq",
         role: "AGENCY_OWNER",
       },
+      ownedAgencies: [mockAgency],
       activeAgency: mockAgency,
       isLoading: false,
       isAuthenticated: true,
+      isAgencyOwner: true,
+      isAdmin: false,
+      error: null,
       loginWithToken: vi.fn(),
       logout: vi.fn(),
-      switchAgency: vi.fn(),
-      refreshUser: vi.fn(),
+      setActiveAgency: vi.fn(),
+      refreshAgencies: vi.fn(),
     });
 
     vi.spyOn(tripsApi, "listTrips").mockResolvedValue({
