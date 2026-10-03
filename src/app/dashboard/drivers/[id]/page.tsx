@@ -118,10 +118,24 @@ export default function DriverDetailPage() {
         : null,
     enabled: !!agencyId && !!resolvedMembershipId,
     initialData: resolvedFromList || undefined,
+    initialDataUpdatedAt: 0,
+    staleTime: 0,
   });
 
   const membership = membershipDetail || resolvedFromList || null;
   const driver = membership?.driver;
+  const verificationStatus =
+    driver?.verificationStatus ||
+    driver?.driverVerificationStatus ||
+    "PENDING";
+  const driverStatus =
+    driver?.status ||
+    driver?.driverStatus ||
+    "OFFLINE";
+  const licenseNumber =
+    driver?.licenseNumber ||
+    driver?.licenseNumberMasked ||
+    "Verified at verification stage";
   const isPending = membership?.status === "PENDING";
   const isLoading = (isListLoading && !membership) || (isMembershipLoading && !membership);
   const error = listError || membershipError;
@@ -290,10 +304,10 @@ export default function DriverDetailPage() {
                 <div className="flex items-center gap-2">
                   <Badge
                     variant={
-                      driver?.status === "ONLINE" ? "success" : "neutral"
+                      driverStatus === "ONLINE" ? "success" : "neutral"
                     }
                   >
-                    {driver?.status || "OFFLINE"}
+                    {driverStatus}
                   </Badge>
                   <Badge
                     variant={
@@ -333,7 +347,7 @@ export default function DriverDetailPage() {
                     License Number (Masked)
                   </span>
                   <span className="text-sm font-mono text-slate-900">
-                    {driver?.licenseNumber || "Verified at verification stage"}
+                    {licenseNumber}
                   </span>
                 </div>
 
@@ -343,16 +357,16 @@ export default function DriverDetailPage() {
                   </span>
                   <Badge
                     variant={
-                      driver?.verificationStatus === "VERIFIED"
+                      verificationStatus === "VERIFIED"
                         ? "success"
-                        : driver?.verificationStatus === "REJECTED"
+                        : verificationStatus === "REJECTED"
                         ? "danger"
                         : "warning"
                     }
                     size="sm"
                     className="mt-1"
                   >
-                    {driver?.verificationStatus || "PENDING"}
+                    {verificationStatus}
                   </Badge>
                 </div>
 

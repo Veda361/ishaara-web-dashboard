@@ -41,6 +41,8 @@ export default function DriversPage() {
           })
         : null,
     enabled: !!agencyId,
+    refetchOnMount: true,
+    staleTime: 0,
     retry: (failureCount, err) => {
       // Bounded retry for transient infrastructure/network errors (up to 2 retries)
       if (failureCount >= 2) return false;
@@ -56,13 +58,27 @@ export default function DriversPage() {
   const pagination = membershipData?.pagination || { total: 0, page: 1, limit: 10, totalPages: 1 };
 
   // Filter client-side by search query if user searches names
-  const filteredItems = searchTerm.trim()
+  const searchedItems = searchTerm.trim()
     ? items.filter(
         (m) =>
           m.driver?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           m.driver?.email?.toLowerCase().includes(searchTerm.toLowerCase())
       )
     : items;
+
+  // Defensive tab filtering: Ensure PENDING tab strictly shows pending records and never APPROVED drivers
+  const filteredItems = searchedItems.filter((m) => {
+    if (statusFilter === "PENDING") {
+      return m.status === "PENDING";
+    }
+    if (statusFilter === "APPROVED") {
+      return m.status === "APPROVED" || m.status === "ACTIVE";
+    }
+    if (statusFilter === "REJECTED") {
+      return m.status === "REJECTED";
+    }
+    return true;
+  });
 
   return (
     <div className="space-y-6">
@@ -157,6 +173,15 @@ export default function DriversPage() {
                 <TableBody>
                   {filteredItems.map((mem) => {
                     const driver = mem.driver;
+                    const verificationStatus =
+                      driver?.verificationStatus ||
+                      driver?.driverVerificationStatus ||
+                      "PENDING";
+                    const driverStatus =
+                      driver?.status ||
+                      driver?.driverStatus ||
+                      "OFFLINE";
+
                     return (
                       <TableRow key={mem.id}>
                         <TableCell>
@@ -173,24 +198,24 @@ export default function DriversPage() {
                         </TableCell>
                         <TableCell>
                           <Badge
-                            variant={driver?.status === "ONLINE" ? "success" : "neutral"}
+                            variant={driverStatus === "ONLINE" ? "success" : "neutral"}
                             size="sm"
                           >
-                            {driver?.status || "OFFLINE"}
+                            {driverStatus}
                           </Badge>
                         </TableCell>
                         <TableCell>
                           <Badge
                             variant={
-                              driver?.verificationStatus === "VERIFIED"
+                              verificationStatus === "VERIFIED"
                                 ? "success"
-                                : driver?.verificationStatus === "REJECTED"
+                                : verificationStatus === "REJECTED"
                                 ? "danger"
                                 : "warning"
                             }
                             size="sm"
                           >
-                            {driver?.verificationStatus || "PENDING"}
+                            {verificationStatus}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -229,6 +254,11 @@ export default function DriversPage() {
             <div className="md:hidden space-y-3">
               {filteredItems.map((mem) => {
                 const driver = mem.driver;
+                const verificationStatus =
+                  driver?.verificationStatus ||
+                  driver?.driverVerificationStatus ||
+                  "PENDING";
+
                 return (
                   <div
                     key={mem.id}
@@ -256,7 +286,7 @@ export default function DriversPage() {
                     <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 pt-2 border-t border-slate-100">
                       <div>
                         <span className="text-[10px] text-slate-400 uppercase block">Platform KYC</span>
-                        <span className="font-medium">{driver?.verificationStatus || "PENDING"}</span>
+                        <span className="font-medium">{verificationStatus}</span>
                       </div>
                       <div>
                         <span className="text-[10px] text-slate-400 uppercase block">Experience</span>

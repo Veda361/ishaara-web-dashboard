@@ -59,17 +59,23 @@ export default function AssignmentsPage() {
 
   // Distinguish verified drivers (eligible) vs unverified drivers (ineligible)
   const verifiedMemberships = approvedMemberships.filter(
-    (m) => m.driver?.verificationStatus === "VERIFIED"
+    (m) =>
+      (m.driver?.verificationStatus ||
+        m.driver?.driverVerificationStatus) === "VERIFIED"
   );
   const unverifiedMemberships = approvedMemberships.filter(
-    (m) => m.driver?.verificationStatus !== "VERIFIED"
+    (m) =>
+      (m.driver?.verificationStatus ||
+        m.driver?.driverVerificationStatus) !== "VERIFIED"
   );
 
   const selectedDriverMembership = approvedMemberships.find(
     (m) => (m.driverId || m.id) === selectedDriverId
   );
   const isSelectedDriverVerified =
-    selectedDriverMembership?.driver?.verificationStatus === "VERIFIED";
+    (selectedDriverMembership?.driver?.verificationStatus ||
+      selectedDriverMembership?.driver?.driverVerificationStatus) ===
+    "VERIFIED";
 
   const selectedVehicle = vehicles.find((v) => v.id === selectedVehicleId);
   const isSelectedVehicleAssigned = !!selectedVehicle?.currentAssignment;
@@ -317,7 +323,10 @@ export default function AssignmentsPage() {
               {unverifiedMemberships.length > 0 && (
                 <optgroup label="Pending / Unverified Drivers (Ineligible)">
                   {unverifiedMemberships.map((m) => {
-                    const statusText = m.driver?.verificationStatus || "PENDING";
+                    const statusText =
+                      m.driver?.verificationStatus ||
+                      m.driver?.driverVerificationStatus ||
+                      "PENDING";
                     return (
                       <option
                         key={m.driverId || m.id}
@@ -341,7 +350,12 @@ export default function AssignmentsPage() {
                 <span className="font-semibold block">Driver Verification Required:</span>
                 <p>
                   {selectedDriverMembership.driver?.name || "This driver"} has platform verification status:{" "}
-                  <strong>{selectedDriverMembership.driver?.verificationStatus || "PENDING"}</strong>. Drivers must be platform VERIFIED before vehicle assignment.
+                  <strong>
+                    {selectedDriverMembership.driver?.verificationStatus ||
+                      selectedDriverMembership.driver?.driverVerificationStatus ||
+                      "PENDING"}
+                  </strong>
+                  . Drivers must be platform VERIFIED before vehicle assignment.
                 </p>
               </div>
               <Link

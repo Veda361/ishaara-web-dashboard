@@ -357,4 +357,99 @@ describe("Driver Membership Detail Contract & ID Separation", () => {
     const message = formatApiErrorMessage(errorWithDetails);
     expect(message).toBe("Approval does not accept body parameters");
   });
+
+  describe("Backend driverVerificationStatus vs UI Platform Verification Display", () => {
+    // Exact shape returned by backend production endpoint for Bhoomi Sahu
+    const bhoomiSahuBackendPayload: AgencyMembership = {
+      id: "6ac09045c639422a5e7ef19f",
+      agencyId: "6abfc5c876fbc787b93052d3",
+      driverId: "6ac0902cc639422a5e7ef184",
+      driver: {
+        driverId: "6ac0902cc639422a5e7ef184",
+        userId: "6ac08fe2c639422a5e7ef15e",
+        name: "Bhoomi Sahu",
+        email: "devrajeshsahu@gmail.com",
+        licenseNumberMasked: "****3929",
+        yearsOfExperience: 4,
+        operatingType: "AGENCY",
+        driverStatus: "OFFLINE",
+        driverVerificationStatus: "VERIFIED",
+      },
+      status: "APPROVED",
+      requestedAt: "2026-10-03T05:19:01.766Z",
+      respondedAt: "2026-10-03T06:19:05.506Z",
+      reviewedBy: "6abfa37afac0b5a7cbd556e8",
+      rejectionReason: null,
+      notes: null,
+      createdAt: "2026-10-03T05:19:01.767Z",
+      updatedAt: "2026-10-03T06:19:05.506Z",
+    };
+
+    it("DriversPage: renders Platform Verification as 'VERIFIED' when backend returns driverVerificationStatus: VERIFIED", async () => {
+      vi.spyOn(membershipsApi, "listMemberships").mockResolvedValue({
+        items: [bhoomiSahuBackendPayload],
+        pagination: { total: 1, page: 1, limit: 10, totalPages: 1 },
+      });
+
+      const Wrapper = createTestWrapper();
+      render(<DriversPage />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        expect(screen.getAllByText("Bhoomi Sahu").length).toBeGreaterThan(0);
+      });
+
+      // Confirm verification status is rendered as VERIFIED in table cell
+      const verifiedBadges = screen.getAllByText("VERIFIED");
+      expect(verifiedBadges.length).toBeGreaterThan(0);
+      expect(screen.getByRole("cell", { name: "VERIFIED" })).toBeDefined();
+    });
+
+    it("DriversPage: When filtering by PENDING, approved/verified driver Bhoomi Sahu is NOT displayed", async () => {
+      // Backend returns empty list for ?status=PENDING
+      vi.spyOn(membershipsApi, "listMemberships").mockResolvedValue({
+        items: [],
+        pagination: { total: 0, page: 1, limit: 10, totalPages: 1 },
+      });
+
+      const Wrapper = createTestWrapper();
+      render(<DriversPage />, { wrapper: Wrapper });
+
+      // Click "PENDING" filter tab
+      const pendingTab = screen.getByRole("button", { name: "PENDING" });
+      fireEvent.click(pendingTab);
+
+      await waitFor(() => {
+        expect(screen.getByText(/No driver applications are waiting for review/i)).toBeDefined();
+      });
+
+      // Must not show Bhoomi Sahu
+      expect(screen.queryByText("Bhoomi Sahu")).toBeNull();
+    });
+
+    it("DriverDetailPage: renders Platform KYC Status as 'VERIFIED' for Bhoomi Sahu (6ac0902cc639422a5e7ef184)", async () => {
+      mockParams = { id: "6ac09045c639422a5e7ef19f" };
+      vi.spyOn(membershipsApi, "getMembership").mockResolvedValue(bhoomiSahuBackendPayload);
+      vi.spyOn(membershipsApi, "listMemberships").mockResolvedValue({
+        items: [bhoomiSahuBackendPayload],
+        pagination: { total: 1, page: 1, limit: 10, totalPages: 1 },
+      });
+
+      const Wrapper = createTestWrapper();
+      render(<DriverDetailPage />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        expect(screen.getAllByText("Bhoomi Sahu").length).toBeGreaterThan(0);
+      });
+
+      // Confirm Platform KYC Status badge displays VERIFIED
+      const verifiedBadges = screen.getAllByText("VERIFIED");
+      expect(verifiedBadges.length).toBeGreaterThan(0);
+
+      // Confirm masked license number is rendered
+      expect(screen.getByText("****3929")).toBeDefined();
+
+      // Confirm status is OFFLINE
+      expect(screen.getByText("OFFLINE")).toBeDefined();
+    });
+  });
 });

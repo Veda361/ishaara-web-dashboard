@@ -1,5 +1,5 @@
 import { apiClient } from "./client";
-import { AgencyMembership, ApiResponse, PaginatedResult } from "@/types";
+import { AgencyMembership, ApiResponse, DriverStatus, DriverVerificationStatus, PaginatedResult } from "@/types";
 
 export interface ListMembershipsParams {
   status?: string;
@@ -9,6 +9,47 @@ export interface ListMembershipsParams {
 
 export interface RejectMembershipPayload {
   reason: string;
+}
+
+export function normalizeMembership(mem: AgencyMembership): AgencyMembership {
+  if (!mem) return mem;
+  const rawDriver = mem.driver;
+  if (!rawDriver) return mem;
+
+  const verificationStatus: DriverVerificationStatus =
+    rawDriver.verificationStatus ||
+    rawDriver.driverVerificationStatus ||
+    "PENDING";
+
+  const status: DriverStatus =
+    rawDriver.status ||
+    rawDriver.driverStatus ||
+    "OFFLINE";
+
+  const licenseNumber: string | undefined =
+    rawDriver.licenseNumber ||
+    rawDriver.licenseNumberMasked ||
+    undefined;
+
+  const id: string =
+    rawDriver.id ||
+    rawDriver.driverId ||
+    mem.driverId;
+
+  return {
+    ...mem,
+    driver: {
+      ...rawDriver,
+      id,
+      driverId: rawDriver.driverId || id,
+      status,
+      driverStatus: rawDriver.driverStatus || status,
+      verificationStatus,
+      driverVerificationStatus: rawDriver.driverVerificationStatus || verificationStatus,
+      licenseNumber,
+      licenseNumberMasked: rawDriver.licenseNumberMasked || licenseNumber,
+    },
+  };
 }
 
 export const membershipsApi = {
@@ -33,7 +74,11 @@ export const membershipsApi = {
     }`;
 
     const res = await apiClient.get<ApiResponse<PaginatedResult<AgencyMembership>>>(endpoint);
-    return res.data;
+    const data = res.data;
+    return {
+      ...data,
+      items: (data?.items || []).map(normalizeMembership),
+    };
   },
 
   async getMembership(
@@ -44,7 +89,7 @@ export const membershipsApi = {
       agencyId
     )}/memberships/${encodeURIComponent(membershipId)}`;
     const res = await apiClient.get<ApiResponse<AgencyMembership>>(endpoint);
-    return res.data;
+    return normalizeMembership(res.data);
   },
 
   async approveMembership(
@@ -55,7 +100,7 @@ export const membershipsApi = {
       agencyId
     )}/memberships/${encodeURIComponent(membershipId)}/approve`;
     const res = await apiClient.post<ApiResponse<AgencyMembership>>(endpoint);
-    return res.data;
+    return normalizeMembership(res.data);
   },
 
   async rejectMembership(
@@ -69,6 +114,6 @@ export const membershipsApi = {
     const res = await apiClient.post<ApiResponse<AgencyMembership>>(endpoint, {
       reason: payload.reason,
     });
-    return res.data;
+    return normalizeMembership(res.data);
   },
 };

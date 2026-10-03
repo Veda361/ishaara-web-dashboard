@@ -55,15 +55,19 @@ export type DriverStatus = "ONLINE" | "OFFLINE";
 export type DriverVerificationStatus = "PENDING" | "VERIFIED" | "REJECTED";
 
 export interface DriverInfo {
-  id: string;
+  id?: string;
+  driverId?: string;
   userId?: string;
   name: string;
   email: string;
   yearsOfExperience?: number;
-  operatingType: DriverOperatingType;
-  status: DriverStatus;
-  verificationStatus: DriverVerificationStatus;
+  operatingType?: DriverOperatingType;
+  status?: DriverStatus;
+  driverStatus?: DriverStatus;
+  verificationStatus?: DriverVerificationStatus;
+  driverVerificationStatus?: DriverVerificationStatus;
   licenseNumber?: string;
+  licenseNumberMasked?: string;
   phoneNumber?: string;
 }
 
@@ -75,7 +79,10 @@ export interface AgencyMembership {
   notes?: string | null;
   rejectionReason?: string | null;
   createdAt: string;
+  updatedAt?: string;
+  requestedAt?: string | null;
   respondedAt?: string | null;
+  reviewedBy?: string | null;
   driver?: DriverInfo;
 }
 
