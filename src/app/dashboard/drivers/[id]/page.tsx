@@ -269,7 +269,7 @@ export default function DriverDetailPage() {
               <div className="text-xs text-indigo-950 space-y-1">
                 <span className="font-semibold block">Important Domain Invariant:</span>
                 <p>
-                  Approving a driver adds them to your agency fleet, enabling vehicle assignments. It does <strong>not</strong> grant platform-level KYC verification, which is audited independently.
+                  Approving a driver adds them to your agency fleet. However, drivers must also complete platform KYC verification before they can be assigned to vehicles.
                 </p>
               </div>
             </div>
@@ -446,7 +446,7 @@ export default function DriverDetailPage() {
           </div>
 
           <p className="text-xs text-slate-600">
-            Once approved, the driver will be enrolled as an active member of your agency fleet and eligible for vehicle assignments.
+            Once approved, the driver will be enrolled as an active member of your agency fleet. Note that vehicle assignments require independent platform verification.
           </p>
 
           <div className="flex justify-end gap-2 pt-2">

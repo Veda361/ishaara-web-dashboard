@@ -52,6 +52,9 @@ export function formatApiErrorMessage(error: unknown): string {
       return "You do not have permission to perform this action.";
     }
     if (error.status === 400) {
+      if (error.code === "DRIVER_NOT_VERIFIED") {
+        return "Driver must be platform VERIFIED before vehicle assignment.";
+      }
       if (Array.isArray(error.details) && error.details.length > 0) {
         const detailMsgs = error.details
           .map((d: unknown) => {

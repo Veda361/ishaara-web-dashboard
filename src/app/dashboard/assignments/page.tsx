@@ -7,16 +7,24 @@ import { vehiclesApi } from "@/lib/api/vehicles";
 import { membershipsApi } from "@/lib/api/memberships";
 import { TopNav } from "@/components/layout/TopNav";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog } from "@/components/ui/dialog";
 import { TableSkeleton } from "@/components/ui/skeleton";
-import { Alert } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/toast";
 import { formatApiErrorMessage } from "@/lib/errors";
 import { formatDateTime } from "@/lib/utils";
-import { Link2, Plus, UserX, Info, Bus, UserCheck } from "lucide-react";
+import Link from "next/link";
+import {
+  Link2,
+  Plus,
+  UserX,
+  Info,
+  UserCheck,
+  ShieldAlert,
+  ShieldCheck,
+  ExternalLink,
+} from "lucide-react";
 
 export default function AssignmentsPage() {
   const { activeAgency } = useAuth();
@@ -48,6 +56,23 @@ export default function AssignmentsPage() {
 
   // Active assignments extracted from vehicles
   const assignedVehicles = vehicles.filter((v) => !!v.currentAssignment);
+
+  // Distinguish verified drivers (eligible) vs unverified drivers (ineligible)
+  const verifiedMemberships = approvedMemberships.filter(
+    (m) => m.driver?.verificationStatus === "VERIFIED"
+  );
+  const unverifiedMemberships = approvedMemberships.filter(
+    (m) => m.driver?.verificationStatus !== "VERIFIED"
+  );
+
+  const selectedDriverMembership = approvedMemberships.find(
+    (m) => (m.driverId || m.id) === selectedDriverId
+  );
+  const isSelectedDriverVerified =
+    selectedDriverMembership?.driver?.verificationStatus === "VERIFIED";
+
+  const selectedVehicle = vehicles.find((v) => v.id === selectedVehicleId);
+  const isSelectedVehicleAssigned = !!selectedVehicle?.currentAssignment;
 
   const assignMutation = useMutation({
     mutationFn: () =>
@@ -82,6 +107,13 @@ export default function AssignmentsPage() {
   const handleAssignSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedVehicleId || !selectedDriverId) return;
+
+    // Phase 5 defensive frontend validation: verify platform verification status === VERIFIED
+    if (!isSelectedDriverVerified) {
+      toast("Driver must be platform VERIFIED before vehicle assignment.", "error");
+      return;
+    }
+
     assignMutation.mutate();
   };
 
@@ -187,11 +219,53 @@ export default function AssignmentsPage() {
       {/* Assign Driver Dialog */}
       <Dialog
         isOpen={isAssignOpen}
-        onClose={() => setIsAssignOpen(false)}
+        onClose={() => {
+          setIsAssignOpen(false);
+          setSelectedVehicleId("");
+          setSelectedDriverId("");
+        }}
         title="Assign Driver to Vehicle"
-        description="Select an available fleet vehicle and an approved agency driver."
+        description="Select an available fleet vehicle and an eligible, platform-verified agency driver."
       >
         <form onSubmit={handleAssignSubmit} className="space-y-4">
+          {/* Phase 4: Handle empty verified driver list */}
+          {approvedMemberships.length > 0 && verifiedMemberships.length === 0 && (
+            <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 space-y-1.5">
+              <div className="flex items-center gap-2 text-amber-900 font-semibold text-xs">
+                <ShieldAlert className="h-4 w-4 text-amber-600 shrink-0" />
+                <span>No verified drivers available</span>
+              </div>
+              <p className="text-xs text-amber-800 leading-relaxed">
+                Drivers must complete platform verification before they can be assigned to a vehicle.
+              </p>
+              <div className="pt-1">
+                <Link
+                  href="/dashboard/drivers"
+                  className="inline-flex items-center gap-1 text-xs font-medium text-amber-950 underline hover:text-black"
+                >
+                  Manage fleet drivers & verification status
+                  <ExternalLink className="h-3 w-3" />
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {approvedMemberships.length === 0 && !isDriversLoading && (
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1">
+              <span className="font-semibold block text-slate-800">No approved drivers found</span>
+              <p>Your agency has no approved drivers in its fleet yet. You must review and approve driver applications before assigning them to vehicles.</p>
+              <div className="pt-1">
+                <Link
+                  href="/dashboard/drivers"
+                  className="inline-flex items-center gap-1 font-medium text-indigo-600 hover:text-indigo-800"
+                >
+                  Go to Driver Applications
+                  <ExternalLink className="h-3 w-3" />
+                </Link>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-700">Select Vehicle *</label>
             <select
@@ -207,31 +281,100 @@ export default function AssignmentsPage() {
                 </option>
               ))}
             </select>
+            {isSelectedVehicleAssigned && (
+              <p className="text-[11px] text-amber-600">
+                Notice: This vehicle already has an active driver assignment. Reassignment will terminate the previous pairing.
+              </p>
+            )}
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-700">Select Approved Driver *</label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-slate-700">Select Verified Driver *</label>
+              <span className="text-[11px] text-slate-400 font-medium">
+                {verifiedMemberships.length} verified available
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500">
+              Only platform-verified drivers can be assigned to vehicles.
+            </p>
             <select
               className="w-full px-3.5 py-2.5 bg-white text-slate-900 text-sm rounded-xl border border-slate-200"
               value={selectedDriverId}
               onChange={(e) => setSelectedDriverId(e.target.value)}
               required
             >
-              <option value="">— Choose an approved driver —</option>
-              {approvedMemberships.map((m) => (
-                <option key={m.driverId || m.id} value={m.driverId || m.id}>
-                  {m.driver?.name || "Driver"} ({m.driver?.email || m.driverId})
-                </option>
-              ))}
+              <option value="">— Choose an eligible verified driver —</option>
+              {verifiedMemberships.length > 0 && (
+                <optgroup label="Platform Verified Drivers (Eligible)">
+                  {verifiedMemberships.map((m) => (
+                    <option key={m.driverId || m.id} value={m.driverId || m.id}>
+                      {m.driver?.name || "Driver"} ({m.driver?.email || m.driverId})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {unverifiedMemberships.length > 0 && (
+                <optgroup label="Pending / Unverified Drivers (Ineligible)">
+                  {unverifiedMemberships.map((m) => {
+                    const statusText = m.driver?.verificationStatus || "PENDING";
+                    return (
+                      <option
+                        key={m.driverId || m.id}
+                        value={m.driverId || m.id}
+                        disabled
+                        className="text-slate-400 bg-slate-50"
+                      >
+                        {m.driver?.name || "Driver"} ({m.driver?.email || m.driverId}) — Platform verification {statusText.toLowerCase()}
+                      </option>
+                    );
+                  })}
+                </optgroup>
+              )}
             </select>
           </div>
+
+          {/* Phase 9: Driver verification link if an unverified driver is chosen */}
+          {selectedDriverMembership && !isSelectedDriverVerified && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-900 flex items-start justify-between gap-3">
+              <div>
+                <span className="font-semibold block">Driver Verification Required:</span>
+                <p>
+                  {selectedDriverMembership.driver?.name || "This driver"} has platform verification status:{" "}
+                  <strong>{selectedDriverMembership.driver?.verificationStatus || "PENDING"}</strong>. Drivers must be platform VERIFIED before vehicle assignment.
+                </p>
+              </div>
+              <Link
+                href={`/dashboard/drivers/${selectedDriverMembership.id}`}
+                target="_blank"
+                className="shrink-0 inline-flex items-center gap-1 font-semibold text-rose-950 underline hover:text-rose-800"
+              >
+                View Driver Verification
+                <ExternalLink className="h-3 w-3" />
+              </Link>
+            </div>
+          )}
+
+          {/* Verification confirmation when verified driver is selected */}
+          {selectedDriverMembership && isSelectedDriverVerified && (
+            <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
+              <span>
+                Driver <strong>{selectedDriverMembership.driver?.name}</strong> is platform VERIFIED and eligible for vehicle assignment.
+              </span>
+            </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => setIsAssignOpen(false)}
+              onClick={() => {
+                setIsAssignOpen(false);
+                setSelectedVehicleId("");
+                setSelectedDriverId("");
+              }}
             >
               Cancel
             </Button>
@@ -239,7 +382,12 @@ export default function AssignmentsPage() {
               type="submit"
               size="sm"
               isLoading={assignMutation.isPending}
-              disabled={!selectedVehicleId || !selectedDriverId}
+              disabled={
+                !selectedVehicleId ||
+                !selectedDriverId ||
+                !isSelectedDriverVerified ||
+                assignMutation.isPending
+              }
             >
               Confirm Assignment
             </Button>
