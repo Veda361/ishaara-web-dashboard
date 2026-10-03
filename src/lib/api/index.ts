@@ -5,3 +5,4 @@ export * from "./memberships";
 export * from "./vehicles";
 export * from "./trips";
 export * from "./settlements";
+export * from "./locations";

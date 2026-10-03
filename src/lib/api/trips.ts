@@ -1,12 +1,12 @@
 import { apiClient } from "./client";
-import { Trip, TripStatus, LocationPoint, ApiResponse, PaginatedResult } from "@/types";
+import { Trip, TripStatus, TripLocationInput, ApiResponse, PaginatedResult } from "@/types";
 
 export interface DispatchTripPayload {
-  origin: LocationPoint;
-  destination: LocationPoint;
-  scheduledStartTime: string;
-  vehicleId: string;
   driverId: string;
+  vehicleId: string;
+  origin: TripLocationInput;
+  destination: TripLocationInput;
+  scheduledDepartureAt?: string;
 }
 
 export const tripsApi = {
@@ -24,7 +24,20 @@ export const tripsApi = {
       qs ? `?${qs}` : ""
     }`;
 
-    const res = await apiClient.get<ApiResponse<PaginatedResult<Trip>>>(endpoint);
+    const res = await apiClient.get<ApiResponse<PaginatedResult<Trip> | Trip[]>>(endpoint);
+    if (Array.isArray(res.data)) {
+      const page = params?.page || 1;
+      const limit = params?.limit || 20;
+      return {
+        items: res.data,
+        pagination: {
+          total: res.data.length,
+          page,
+          limit,
+          totalPages: Math.max(1, Math.ceil(res.data.length / limit)),
+        },
+      };
+    }
     return res.data;
   },
 
@@ -38,7 +51,31 @@ export const tripsApi = {
 
   async dispatchTrip(agencyId: string, payload: DispatchTripPayload): Promise<Trip> {
     const endpoint = `/api/v1/agencies/${encodeURIComponent(agencyId)}/trips`;
-    const res = await apiClient.post<ApiResponse<Trip>>(endpoint, payload);
+
+    // Strictly format location payloads to exclude any unpermitted fields
+    const sanitizedPayload: DispatchTripPayload = {
+      driverId: payload.driverId,
+      vehicleId: payload.vehicleId,
+      origin: {
+        ...(payload.origin.name ? { name: payload.origin.name } : {}),
+        formattedAddress: payload.origin.formattedAddress,
+        latitude: payload.origin.latitude,
+        longitude: payload.origin.longitude,
+        ...(payload.origin.googlePlaceId ? { googlePlaceId: payload.origin.googlePlaceId } : {}),
+        ...(payload.origin.serpApiDataId ? { serpApiDataId: payload.origin.serpApiDataId } : {}),
+      },
+      destination: {
+        ...(payload.destination.name ? { name: payload.destination.name } : {}),
+        formattedAddress: payload.destination.formattedAddress,
+        latitude: payload.destination.latitude,
+        longitude: payload.destination.longitude,
+        ...(payload.destination.googlePlaceId ? { googlePlaceId: payload.destination.googlePlaceId } : {}),
+        ...(payload.destination.serpApiDataId ? { serpApiDataId: payload.destination.serpApiDataId } : {}),
+      },
+      ...(payload.scheduledDepartureAt ? { scheduledDepartureAt: payload.scheduledDepartureAt } : {}),
+    };
+
+    const res = await apiClient.post<ApiResponse<Trip>>(endpoint, sanitizedPayload);
     return res.data;
   },
 

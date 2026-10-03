@@ -18,7 +18,8 @@ import { useToast } from "@/components/ui/toast";
 import { formatDateTime } from "@/lib/utils";
 import { formatApiErrorMessage } from "@/lib/errors";
 import { Navigation2, Plus, Ban, ChevronLeft, ChevronRight } from "lucide-react";
-import { TripStatus } from "@/types";
+import { TripStatus, TripLocationInput } from "@/types";
+import { LocationPicker } from "@/components/trips/LocationPicker";
 
 export default function TripsPage() {
   const { activeAgency } = useAuth();
@@ -34,12 +35,10 @@ export default function TripsPage() {
   const [cancelReason, setCancelReason] = useState("");
 
   // Dispatch Form
-  const [originName, setOriginName] = useState("");
-  const [originLng, setOriginLng] = useState("73.8567");
-  const [originLat, setOriginLat] = useState("18.5204");
-  const [destName, setDestName] = useState("");
-  const [destLng, setDestLng] = useState("73.8700");
-  const [destLat, setDestLat] = useState("18.5300");
+  const [originLocation, setOriginLocation] = useState<TripLocationInput | null>(null);
+  const [destLocation, setDestLocation] = useState<TripLocationInput | null>(null);
+  const [originError, setOriginError] = useState<string | null>(null);
+  const [destError, setDestError] = useState<string | null>(null);
   const [vehicleId, setVehicleId] = useState("");
   const [driverId, setDriverId] = useState("");
   const [startTime, setStartTime] = useState("");
@@ -117,17 +116,81 @@ export default function TripsPage() {
     }
   };
 
+  const handleOpenDispatch = () => {
+    setOriginLocation(null);
+    setDestLocation(null);
+    setOriginError(null);
+    setDestError(null);
+    setVehicleId("");
+    setDriverId("");
+    setStartTime("");
+    setIsDispatchOpen(true);
+  };
+
   const handleDispatchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!originName || !destName || !vehicleId || !driverId) return;
 
-    dispatchMutation.mutate({
-      origin: { name: originName, coordinates: [Number(originLng), Number(originLat)] },
-      destination: { name: destName, coordinates: [Number(destLng), Number(destLat)] },
-      scheduledStartTime: startTime ? new Date(startTime).toISOString() : new Date().toISOString(),
-      vehicleId,
+    let hasError = false;
+
+    if (
+      !originLocation ||
+      typeof originLocation.latitude !== "number" ||
+      typeof originLocation.longitude !== "number" ||
+      !originLocation.formattedAddress
+    ) {
+      setOriginError("Please select a valid origin location from the search results.");
+      hasError = true;
+    } else {
+      setOriginError(null);
+    }
+
+    if (
+      !destLocation ||
+      typeof destLocation.latitude !== "number" ||
+      typeof destLocation.longitude !== "number" ||
+      !destLocation.formattedAddress
+    ) {
+      setDestError("Please select a valid destination location from the search results.");
+      hasError = true;
+    } else {
+      setDestError(null);
+    }
+
+    if (!vehicleId) {
+      toast("Please select a vehicle.", "error");
+      hasError = true;
+    }
+
+    if (!driverId) {
+      toast("Please select a driver.", "error");
+      hasError = true;
+    }
+
+    if (hasError) return;
+
+    const payload: DispatchTripPayload = {
       driverId,
-    });
+      vehicleId,
+      origin: {
+        ...(originLocation!.name ? { name: originLocation!.name } : {}),
+        formattedAddress: originLocation!.formattedAddress,
+        latitude: originLocation!.latitude,
+        longitude: originLocation!.longitude,
+        ...(originLocation!.googlePlaceId ? { googlePlaceId: originLocation!.googlePlaceId } : {}),
+        ...(originLocation!.serpApiDataId ? { serpApiDataId: originLocation!.serpApiDataId } : {}),
+      },
+      destination: {
+        ...(destLocation!.name ? { name: destLocation!.name } : {}),
+        formattedAddress: destLocation!.formattedAddress,
+        latitude: destLocation!.latitude,
+        longitude: destLocation!.longitude,
+        ...(destLocation!.googlePlaceId ? { googlePlaceId: destLocation!.googlePlaceId } : {}),
+        ...(destLocation!.serpApiDataId ? { serpApiDataId: destLocation!.serpApiDataId } : {}),
+      },
+      ...(startTime ? { scheduledDepartureAt: new Date(startTime).toISOString() } : {}),
+    };
+
+    dispatchMutation.mutate(payload);
   };
 
   return (
@@ -159,7 +222,7 @@ export default function TripsPage() {
             ))}
           </div>
 
-          <Button size="sm" onClick={() => setIsDispatchOpen(true)} className="gap-1.5">
+          <Button size="sm" onClick={handleOpenDispatch} className="gap-1.5">
             <Plus className="h-4 w-4" />
             Dispatch Trip
           </Button>
@@ -200,7 +263,8 @@ export default function TripsPage() {
                     <TableCell>
                       <div>
                         <p className="font-semibold text-slate-900 text-xs">
-                          {trip.origin?.name} → {trip.destination?.name}
+                          {trip.origin?.name || trip.origin?.formattedAddress || "Origin"} →{" "}
+                          {trip.destination?.name || trip.destination?.formattedAddress || "Destination"}
                         </p>
                         <p className="text-[10px] text-slate-400 font-mono">ID: {trip.id.slice(0, 12)}...</p>
                       </div>
@@ -212,7 +276,7 @@ export default function TripsPage() {
                       {trip.driver?.name || trip.driverId}
                     </TableCell>
                     <TableCell className="text-xs text-slate-500">
-                      {formatDateTime(trip.scheduledStartTime)}
+                      {formatDateTime(trip.scheduledDepartureAt || trip.scheduledStartTime || trip.createdAt || "")}
                     </TableCell>
                     <TableCell>{getTripBadge(trip.status)}</TableCell>
                     <TableCell className="text-right">
@@ -273,25 +337,38 @@ export default function TripsPage() {
         title="Agency Fleet Dispatch"
         description="Schedule a new agency transit route."
       >
-        <form onSubmit={handleDispatchSubmit} className="space-y-4">
-          <Input
-            label="Origin Landmark *"
-            placeholder="e.g. North Campus Gate"
-            value={originName}
-            onChange={(e) => setOriginName(e.target.value)}
-            required
+        <form onSubmit={handleDispatchSubmit} noValidate className="space-y-4">
+          <LocationPicker
+            label="Origin Landmark / Location *"
+            placeholder="Search origin landmark (e.g. Jhansi)..."
+            value={originLocation}
+            onChange={(loc) => {
+              setOriginLocation(loc);
+              if (loc) setOriginError(null);
+            }}
+            error={originError || undefined}
+            variant="origin"
+            id="dispatch-origin-picker"
           />
-          <Input
-            label="Destination Landmark *"
-            placeholder="e.g. Tech Park Station"
-            value={destName}
-            onChange={(e) => setDestName(e.target.value)}
-            required
+
+          <LocationPicker
+            label="Destination Landmark / Location *"
+            placeholder="Search destination landmark (e.g. Datia)..."
+            value={destLocation}
+            onChange={(loc) => {
+              setDestLocation(loc);
+              if (loc) setDestError(null);
+            }}
+            error={destError || undefined}
+            variant="destination"
+            id="dispatch-dest-picker"
           />
+
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-700">Select Vehicle *</label>
+            <label htmlFor="dispatch-vehicle-select" className="text-xs font-semibold text-slate-700">Select Vehicle *</label>
             <select
-              className="w-full px-3.5 py-2.5 bg-white text-slate-900 text-sm rounded-xl border border-slate-200"
+              id="dispatch-vehicle-select"
+              className="w-full px-3.5 py-2.5 bg-white text-slate-900 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               value={vehicleId}
               onChange={(e) => setVehicleId(e.target.value)}
               required
@@ -299,28 +376,33 @@ export default function TripsPage() {
               <option value="">— Select fleet vehicle —</option>
               {vehiclesResult?.items.map((v) => (
                 <option key={v.id} value={v.id}>
-                  {v.registrationNumber} ({v.model})
+                  {v.registrationNumber} ({v.model || v.make || "Vehicle"})
                 </option>
               ))}
             </select>
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-700">Select Driver *</label>
+            <label htmlFor="dispatch-driver-select" className="text-xs font-semibold text-slate-700">Select Driver *</label>
             <select
-              className="w-full px-3.5 py-2.5 bg-white text-slate-900 text-sm rounded-xl border border-slate-200"
+              id="dispatch-driver-select"
+              className="w-full px-3.5 py-2.5 bg-white text-slate-900 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               value={driverId}
               onChange={(e) => setDriverId(e.target.value)}
               required
             >
               <option value="">— Select approved driver —</option>
-              {driversResult?.items.map((m) => (
-                <option key={m.driverId || m.id} value={m.driverId || m.id}>
-                  {m.driver?.name} ({m.driver?.email})
-                </option>
-              ))}
+              {driversResult?.items.map((m) => {
+                const targetDriverId = m.driver?.id || m.driver?.driverId || m.driverId;
+                return (
+                  <option key={m.id} value={targetDriverId}>
+                    {m.driver?.name || "Driver"} ({m.driver?.email || "No email"})
+                  </option>
+                );
+              })}
             </select>
           </div>
           <Input
+            id="dispatch-start-time"
             label="Scheduled Start Time"
             type="datetime-local"
             value={startTime}
@@ -335,7 +417,7 @@ export default function TripsPage() {
             >
               Cancel
             </Button>
-            <Button type="submit" size="sm" isLoading={dispatchMutation.isPending}>
+            <Button id="dispatch-submit-button" type="submit" size="sm" isLoading={dispatchMutation.isPending}>
               Dispatch Trip
             </Button>
           </div>

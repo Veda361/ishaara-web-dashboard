@@ -138,6 +138,44 @@ export interface DriverVehicleAssignment {
 
 export type TripStatus = "CREATED" | "ACTIVE" | "COMPLETED" | "CANCELLED";
 
+export interface ResolvedLocation {
+  latitude: number;
+  longitude: number;
+  formattedAddress: string;
+  displayName?: string;
+  provider?: "google_maps" | "serpapi" | string;
+  googlePlaceId?: string;
+  serpApiDataId?: string;
+  serpApiDataCid?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+}
+
+export interface TripLocationInput {
+  name?: string;
+  formattedAddress: string;
+  latitude: number;
+  longitude: number;
+  googlePlaceId?: string;
+  serpApiDataId?: string;
+}
+
+export interface LocationCoordinatesObject {
+  type?: string;
+  coordinates: [number, number]; // [lng, lat]
+}
+
+export interface TripLocation {
+  name?: string;
+  formattedAddress?: string;
+  coordinates?: LocationCoordinatesObject | [number, number];
+  latitude?: number;
+  longitude?: number;
+  googlePlaceId?: string;
+  serpApiDataId?: string;
+}
+
 export interface LocationPoint {
   name: string;
   coordinates: [number, number]; // [lng, lat]
@@ -145,12 +183,13 @@ export interface LocationPoint {
 
 export interface Trip {
   id: string;
-  agencyId?: string;
+  agencyId?: string | null;
   vehicleId: string;
   driverId: string;
-  origin: LocationPoint;
-  destination: LocationPoint;
-  scheduledStartTime: string;
+  origin: TripLocation;
+  destination: TripLocation;
+  scheduledDepartureAt?: string | null;
+  scheduledStartTime?: string | null;
   status: TripStatus;
   vehicle?: Vehicle;
   driver?: DriverInfo;
