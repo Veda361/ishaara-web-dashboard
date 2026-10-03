@@ -37,7 +37,6 @@ export default function DriverDetailPage() {
 
   const [isApproveOpen, setIsApproveOpen] = useState(false);
   const [isRejectOpen, setIsRejectOpen] = useState(false);
-  const [notes, setNotes] = useState("");
   const [rejectReason, setRejectReason] = useState("");
   const [conflictMessage, setConflictMessage] = useState<string | null>(null);
 
@@ -128,19 +127,16 @@ export default function DriverDetailPage() {
   const error = listError || membershipError;
 
   const approveMutation = useMutation({
-    mutationFn: (notesPayload?: string) => {
+    mutationFn: () => {
       const targetMembershipId = resolvedMembershipId || membership?.id;
       if (!agencyId || !targetMembershipId) {
         throw new Error("Missing agency ID or membership ID for approval.");
       }
-      return membershipsApi.approveMembership(agencyId, targetMembershipId, {
-        notes: notesPayload,
-      });
+      return membershipsApi.approveMembership(agencyId, targetMembershipId);
     },
     onSuccess: () => {
       toast("Driver membership approved successfully", "success");
       setIsApproveOpen(false);
-      setNotes("");
       if (agencyId && resolvedMembershipId) {
         queryClient.invalidateQueries({
           queryKey: ["agency-membership", agencyId, resolvedMembershipId],
@@ -449,16 +445,9 @@ export default function DriverDetailPage() {
             This action admits the driver into your fleet. It does NOT automatically verify the driver at the platform KYC level.
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-700">Optional Notes / Route Assignment</label>
-            <textarea
-              className="w-full p-2.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              rows={3}
-              placeholder="e.g. Approved for Campus East route"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
-          </div>
+          <p className="text-xs text-slate-600">
+            Once approved, the driver will be enrolled as an active member of your agency fleet and eligible for vehicle assignments.
+          </p>
 
           <div className="flex justify-end gap-2 pt-2">
             <Button
@@ -472,7 +461,7 @@ export default function DriverDetailPage() {
             <Button
               size="sm"
               isLoading={approveMutation.isPending}
-              onClick={() => approveMutation.mutate(notes)}
+              onClick={() => approveMutation.mutate()}
             >
               Confirm Approval
             </Button>

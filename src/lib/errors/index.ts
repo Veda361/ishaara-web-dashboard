@@ -51,6 +51,25 @@ export function formatApiErrorMessage(error: unknown): string {
     if (error.status === 403) {
       return "You do not have permission to perform this action.";
     }
+    if (error.status === 400) {
+      if (Array.isArray(error.details) && error.details.length > 0) {
+        const detailMsgs = error.details
+          .map((d: unknown) => {
+            if (typeof d === "object" && d !== null && "message" in d) {
+              const msg = (d as { message?: unknown }).message;
+              return typeof msg === "string" ? msg : "";
+            }
+            return typeof d === "string" ? d : "";
+          })
+          .filter(Boolean);
+        if (detailMsgs.length > 0) {
+          return sanitizeMessage(detailMsgs.join(". "));
+        }
+      } else if (typeof error.details === "string" && error.details.trim()) {
+        return sanitizeMessage(error.details);
+      }
+      return sanitizeMessage(error.message) || "Bad request. Please check input parameters.";
+    }
     if (error.status === 404) {
       return "The requested resource could not be found.";
     }

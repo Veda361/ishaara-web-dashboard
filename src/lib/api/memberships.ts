@@ -7,10 +7,6 @@ export interface ListMembershipsParams {
   limit?: number;
 }
 
-export interface ApproveMembershipPayload {
-  notes?: string;
-}
-
 export interface RejectMembershipPayload {
   reason: string;
 }
@@ -53,16 +49,12 @@ export const membershipsApi = {
 
   async approveMembership(
     agencyId: string,
-    membershipId: string,
-    payload?: ApproveMembershipPayload
+    membershipId: string
   ): Promise<AgencyMembership> {
     const endpoint = `/api/v1/agencies/${encodeURIComponent(
       agencyId
     )}/memberships/${encodeURIComponent(membershipId)}/approve`;
-    const res = await apiClient.post<ApiResponse<AgencyMembership>>(
-      endpoint,
-      payload?.notes ? { notes: payload.notes } : {}
-    );
+    const res = await apiClient.post<ApiResponse<AgencyMembership>>(endpoint);
     return res.data;
   },
 

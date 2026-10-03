@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import DriverDetailPage from "@/app/dashboard/drivers/[id]/page";
 import DriversPage from "@/app/dashboard/drivers/page";
 import { membershipsApi } from "@/lib/api/memberships";
+import { apiClient } from "@/lib/api/client";
+import { ApiError, formatApiErrorMessage } from "@/lib/errors";
 import * as AuthContextModule from "@/lib/auth/AuthContext";
 import { AgencyMembership, PaginatedResult } from "@/types";
 
@@ -82,7 +84,7 @@ describe("Driver Membership Detail Contract & ID Separation", () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
     mockParams = { id: membershipId };
 
     vi.spyOn(AuthContextModule, "useAuth").mockReturnValue({
@@ -229,15 +231,10 @@ describe("Driver Membership Detail Contract & ID Separation", () => {
     fireEvent.click(screen.getByRole("button", { name: /Confirm Approval/i }));
 
     await waitFor(() => {
-      expect(approveSpy).toHaveBeenCalledWith(
-        agencyId,
-        membershipId,
-        expect.anything()
-      );
+      expect(approveSpy).toHaveBeenCalledWith(agencyId, membershipId);
       expect(approveSpy).not.toHaveBeenCalledWith(
         agencyId,
-        driverId,
-        expect.anything()
+        driverId
       );
     });
 
@@ -264,5 +261,61 @@ describe("Driver Membership Detail Contract & ID Separation", () => {
         expect.anything()
       );
     });
+  });
+
+  it("TASK 2 & 6: membershipsApi.approveMembership sends NO request body to backend", async () => {
+    const postSpy = vi.spyOn(apiClient, "post").mockResolvedValue({
+      success: true,
+      data: { ...mockMembershipRecord, status: "ACTIVE" },
+    });
+
+    await membershipsApi.approveMembership(agencyId, membershipId);
+
+    expect(postSpy).toHaveBeenCalledWith(
+      `/api/v1/agencies/${encodeURIComponent(agencyId)}/memberships/${encodeURIComponent(membershipId)}/approve`
+    );
+    // Explicitly verify no body parameter was passed to apiClient.post
+    expect(postSpy.mock.calls[0][1]).toBeUndefined();
+  });
+
+  it("TASK 4: Approval confirmation modal contains no notes input field", async () => {
+    mockParams = { id: membershipId };
+    vi.spyOn(membershipsApi, "getMembership").mockResolvedValue(mockMembershipRecord);
+    vi.spyOn(membershipsApi, "listMemberships").mockResolvedValue(mockMembershipsList);
+
+    const Wrapper = createTestWrapper();
+    render(<DriverDetailPage />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Approve Driver/i })).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Approve Driver/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Confirm Approval/i })).toBeDefined();
+    });
+
+    // Verify notes textarea is completely removed from the approval modal
+    expect(screen.queryByPlaceholderText(/e.g. Approved for Campus East route/i)).toBeNull();
+    expect(screen.queryByText(/Optional Notes/i)).toBeNull();
+    expect(screen.getByText(/You are approving this driver's membership in your agency fleet/i)).toBeDefined();
+  });
+
+  it("TASK 9: formatApiErrorMessage extracts detailed 400 validation messages", () => {
+    const errorWithDetails = new ApiError(
+      400,
+      "VALIDATION_ERROR",
+      "Request validation failed",
+      [
+        {
+          field: "",
+          message: "Approval does not accept body parameters",
+        },
+      ]
+    );
+
+    const message = formatApiErrorMessage(errorWithDetails);
+    expect(message).toBe("Approval does not accept body parameters");
   });
 });

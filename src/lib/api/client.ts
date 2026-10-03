@@ -72,7 +72,7 @@ export async function request<T>(
   }
 
   const requestHeaders = new Headers(headers);
-  if (!requestHeaders.has("Content-Type") && !(rest.body instanceof FormData)) {
+  if (rest.body !== undefined && !requestHeaders.has("Content-Type") && !(rest.body instanceof FormData)) {
     requestHeaders.set("Content-Type", "application/json");
   }
 
